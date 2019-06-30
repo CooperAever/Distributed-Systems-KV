@@ -92,8 +92,8 @@ func doReduce(
 		s := make([]string,1)
 		s[0] = res[i].Value
 		for i+1<len(res) && res[i+1].Key == res[i].Key{
-			i++
 			s = append(s,res[i+1].Value)
+			i++
 		}
     	enc.Encode(KeyValue{res[i].Key,reduceF(res[i].Key,s)})
 	}

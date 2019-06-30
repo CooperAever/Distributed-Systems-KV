@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	// "strings"
-	"encoding/json"
-	"os"
+	// "encoding/json"
+	// "os"
 	"strconv"
 	"hash/fnv"
-	"sort"
+	// "sort"
 	"io/ioutil"
+	"unicode"
+	"bytes"
 )
 type KeyValue struct {
 	Key   string
@@ -110,45 +112,56 @@ func reduceName(jobName string, mapTask int, reduceTask int) string {
 
 
 func main() {
-	var res []KeyValue
-    file_name := "mrtmp.test-1-0"
+    data, err := getFileContent("pg-metamorphosis.txt")
 
-    // if err != nil {
-    //     fmt.Println("File reading error", err)
-    //     return
-    // }
+    if err != nil {
+        fmt.Println("File reading error", err)
+        return
+    }
+    fmt.Println(data[0])
+    fmt.Println(data[len(data)-1])
 
-    // for _,word := range data{
-    // 	fmt.Printf("%s        --- %d \n",word,ihash(word)%3)
-    // }
-
-    fp, _ := os.Open(file_name)
-	defer fp.Close()
-	dec := json.NewDecoder(fp)
-	for {
-    	var V KeyValue
-    	err := dec.Decode(&V)
-    	if err != nil {
-        	break
-    	}
-    	res = append(res, V)
-	}
-		fmt.Println(res)
-	sort.Sort(byKey(res))
-
+    var v KeyValue
+    v.Key = data[0]
+    v.Value = data[len(data)-1]
+    fmt.Println(KeyValue{data[0],data[len(data)-1]})
+    num,_ := strconv.Atoi("123")
+    str := strconv.Itoa(123)
+    fmt.Println(num)
+    fmt.Println(str)
 
 }
 
 
-func getFileContent(filePath string) string{
- 
+
+func getFileContent(filePath string) ([]string,error){
+
+	result := []string {}
 	b,err := ioutil.ReadFile(filePath)
 	if err != nil{
-		return ""
+		return result,err
 	}
 
 	s := string(b)
-	return s
+
+	var buffer bytes.Buffer
+	for _,char := range s{
+		if(unicode.IsLetter(char)){
+			buffer.WriteString(string(char))
+		}else{
+			if (buffer.String() != ""){
+				result = append(result,buffer.String())
+				buffer.Reset()
+			}
+		}
+	}
+	if(buffer.String() != ""){
+		result = append(result,buffer.String())
+	}
+	
+
+
+	return result,nil
 }
 
 

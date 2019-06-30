@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"mapreduce"
 	"os"
+	"unicode"
+	"bytes"
+	"strconv"
 )
 
 //
@@ -15,6 +18,24 @@ import (
 //
 func mapF(filename string, contents string) []mapreduce.KeyValue {
 	// Your code here (Part II).
+	result := []mapreduce.KeyValue {}
+
+	var buffer bytes.Buffer
+	for _,char := range contents{
+		if(unicode.IsLetter(char)){
+			buffer.WriteString(string(char))
+		}else{
+			if (buffer.String() != ""){
+				result = append(result,mapreduce.KeyValue{buffer.String(),"1"})
+				buffer.Reset()
+			}
+		}
+	}
+
+	if(buffer.String() != ""){
+		result = append(result,mapreduce.KeyValue{buffer.String(),"1"})
+	}
+	return result
 }
 
 //
@@ -24,6 +45,12 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 //
 func reduceF(key string, values []string) string {
 	// Your code here (Part II).
+	var result int = 0
+	for _,val := range values{
+		num,_ := strconv.Atoi(val)
+		result = result + num
+	}
+	return strconv.Itoa(result)
 }
 
 // Can be run in 3 ways:
