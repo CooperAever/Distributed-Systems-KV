@@ -5,31 +5,32 @@ import (
 	// "strings"
 	// "encoding/json"
 	// "os"
-	"strconv"
-	"hash/fnv"
+	// "strconv"
+	// "hash/fnv"
 	// "sort"
-	"io/ioutil"
-	"unicode"
-	"bytes"
+	// "io/ioutil"
+	// "unicode"
+	// "bytes"
+	"sync"
 )
-type KeyValue struct {
-	Key   string
-	Value string
-}
+// type KeyValue struct {
+// 	Key   string
+// 	Value string
+// }
 
 
-type byKey []KeyValue
-func (kv byKey) Len()int{
-	return len(kv)
-}
+// type byKey []KeyValue
+// func (kv byKey) Len()int{
+// 	return len(kv)
+// }
 
-func (kv byKey) Swap(i,j int){
-	kv[i],kv[j] = kv[j],kv[i]
-}
+// func (kv byKey) Swap(i,j int){
+// 	kv[i],kv[j] = kv[j],kv[i]
+// }
 
-func (kv byKey) Less(i,j int) bool{
-	return kv[i].Key < kv[j].Key
-}
+// func (kv byKey) Less(i,j int) bool{
+// 	return kv[i].Key < kv[j].Key
+// }
 
 // func main(){
 // 	// var res []KeyValue
@@ -81,16 +82,16 @@ func (kv byKey) Less(i,j int) bool{
 
 // }
 
-func ihash(s string) int {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return int(h.Sum32() & 0x7fffffff)
-}
+// func ihash(s string) int {
+// 	h := fnv.New32a()
+// 	h.Write([]byte(s))
+// 	return int(h.Sum32() & 0x7fffffff)
+// }
 
 
-func reduceName(jobName string, mapTask int, reduceTask int) string {
-	return "mrtmp." + jobName + "-" + strconv.Itoa(mapTask) + "-" + strconv.Itoa(reduceTask)
-}
+// func reduceName(jobName string, mapTask int, reduceTask int) string {
+// 	return "mrtmp." + jobName + "-" + strconv.Itoa(mapTask) + "-" + strconv.Itoa(reduceTask)
+// }
 
 
 
@@ -112,57 +113,73 @@ func reduceName(jobName string, mapTask int, reduceTask int) string {
 
 
 func main() {
-    data, err := getFileContent("pg-metamorphosis.txt")
+    // data, err := getFileContent("pg-metamorphosis.txt")
 
-    if err != nil {
-        fmt.Println("File reading error", err)
-        return
+    // if err != nil {
+    //     fmt.Println("File reading error", err)
+    //     return
+    // }
+    // fmt.Println(data[0])
+    // fmt.Println(data[len(data)-1])
+
+    // var v KeyValue
+    // v.Key = data[0]
+    // v.Value = data[len(data)-1]
+    // fmt.Println(KeyValue{data[0],data[len(data)-1]})
+    // num,_ := strconv.Atoi("123")
+    // str := strconv.Itoa(123)
+    // fmt.Println(num)
+    // fmt.Println(str)
+
+    wg := sync.WaitGroup{}
+    out := make(chan string)
+    for i:= 0;i<10;i++{
+    	wg.Add(1)
+    	go f1(out,&wg)
     }
-    fmt.Println(data[0])
-    fmt.Println(data[len(data)-1])
 
-    var v KeyValue
-    v.Key = data[0]
-    v.Value = data[len(data)-1]
-    fmt.Println(KeyValue{data[0],data[len(data)-1]})
-    num,_ := strconv.Atoi("123")
-    str := strconv.Itoa(123)
-    fmt.Println(num)
-    fmt.Println(str)
+    for i:= 0;i<10;i++{
+    	out<-"123"
+    }
+    wg.Wait()
+}
 
+func f1(in chan string,wg *sync.WaitGroup) {
+	str := <- in
+    wg.Done()
+    fmt.Printf("print %v at wg : %v\n",str,wg)
 }
 
 
+// func getFileContent(filePath string) ([]string,error){
 
-func getFileContent(filePath string) ([]string,error){
+// 	result := []string {}
+// 	b,err := ioutil.ReadFile(filePath)
+// 	if err != nil{
+// 		return result,err
+// 	}
 
-	result := []string {}
-	b,err := ioutil.ReadFile(filePath)
-	if err != nil{
-		return result,err
-	}
+// 	s := string(b)
 
-	s := string(b)
-
-	var buffer bytes.Buffer
-	for _,char := range s{
-		if(unicode.IsLetter(char)){
-			buffer.WriteString(string(char))
-		}else{
-			if (buffer.String() != ""){
-				result = append(result,buffer.String())
-				buffer.Reset()
-			}
-		}
-	}
-	if(buffer.String() != ""){
-		result = append(result,buffer.String())
-	}
+// 	var buffer bytes.Buffer
+// 	for _,char := range s{
+// 		if(unicode.IsLetter(char)){
+// 			buffer.WriteString(string(char))
+// 		}else{
+// 			if (buffer.String() != ""){
+// 				result = append(result,buffer.String())
+// 				buffer.Reset()
+// 			}
+// 		}
+// 	}
+// 	if(buffer.String() != ""){
+// 		result = append(result,buffer.String())
+// 	}
 	
 
 
-	return result,nil
-}
+// 	return result,nil
+// }
 
 
 

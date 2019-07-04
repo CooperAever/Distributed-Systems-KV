@@ -1,7 +1,9 @@
 package mapreduce
 
-import "fmt"
-
+import (
+	"fmt"
+	"sync"
+)
 //
 // schedule() starts and waits for all tasks in the given phase (mapPhase
 // or reducePhase). the mapFiles argument holds the names of the files that
@@ -30,5 +32,48 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	//
 	// Your code here (Part III, Part IV).
 	//
+
+	// schedule() must give each worker a sequence of tasks
+	// schedule() learns about the set of workers by reading its registerChan argument
+	// schedule() tells a worker to execute a task by sending a worker.DoTask RPC to the worker
+	// Use the call() function to send an RPC to a worker
+	// 
+	wg := sync.WaitGroup{}
+	wg.Add(ntasks)
+
+	for i:=0;i<ntasks;i++{
+
+		switch phase{
+		case mapPhase:
+			go receRegisterChan(DoTaskArgs{jobName,mapFiles[i],phase,i,n_other},&wg,registerChan)
+		case reducePhase:
+			go receRegisterChan(DoTaskArgs{jobName,"",phase,i,n_other},&wg,registerChan)
+		}
+		
+	}
+
+
+
+	wg.Wait()
+
 	fmt.Printf("Schedule: %v done\n", phase)
+	return 
 }
+
+
+
+
+
+func receRegisterChan(taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
+	address := <- registerChan
+	call(address,"Worker.DoTask",taskArgument,nil)
+	go func () {registerChan<- address}()
+	wg.Done()
+}
+
+
+// func receRegisterChan(add string,taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
+// 	call(add,"Worker.DoTask",taskArgument,nil)
+// 	registerChan<- add
+// 	wg.Done()
+// }
