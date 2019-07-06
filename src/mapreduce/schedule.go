@@ -45,14 +45,12 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 
 		switch phase{
 		case mapPhase:
-			go receRegisterChan(DoTaskArgs{jobName,mapFiles[i],phase,i,n_other},&wg,registerChan)
+			go Parallel(DoTaskArgs{jobName,mapFiles[i],phase,i,n_other},&wg,registerChan)
 		case reducePhase:
-			go receRegisterChan(DoTaskArgs{jobName,"",phase,i,n_other},&wg,registerChan)
+			go Parallel(DoTaskArgs{jobName,"",phase,i,n_other},&wg,registerChan)
 		}
 		
 	}
-
-
 
 	wg.Wait()
 
@@ -60,16 +58,35 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	return 
 }
 
-
-
-
-
-func receRegisterChan(taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
+func Parallel(taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
 	address := <- registerChan
-	call(address,"Worker.DoTask",taskArgument,nil)
+	if call(address,"Worker.DoTask",taskArgument,nil) == false {
+		go Parallel(taskArgument,wg,registerChan)
+		return 
+	}
 	go func () {registerChan<- address}()
 	wg.Done()
 }
+
+// func mapParallel(taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
+// 	address := <- registerChan
+// 	if call(address,"Worker.DoTask",taskArgument,nil) == false {
+// 		go mapParallel(taskArgument,&wg,registerChan)
+// 		break
+// 	}
+// 	go func () {registerChan<- address}()
+// 	wg.Done()
+// }
+
+// func reduceParallel(taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
+// 	address := <- registerChan
+// 	if call(address,"Worker.DoTask",taskArgument,nil) == false {
+// 		go reduceParallel(taskArgument,&wg,registerChan)
+// 		break
+// 	}
+// 	go func () {registerChan<- address}()
+// 	wg.Done()
+// }
 
 
 // func receRegisterChan(add string,taskArgument DoTaskArgs,wg *sync.WaitGroup,registerChan chan string){
