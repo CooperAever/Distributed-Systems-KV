@@ -8,6 +8,9 @@ import "math/big"
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
+	clientId int64
+	seq int
+	lastLeader int 
 }
 
 func nrand() int64 {
@@ -21,10 +24,12 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// You'll have to add code here.
+	ck.clientId = nrand()
+	ck.seq = 1
+	ck.lastLeader = 0
 	return ck
 }
 
-//
 // fetch the current value for a key.
 // returns "" if the key does not exist.
 // keeps trying forever in the face of all other errors.
@@ -39,6 +44,23 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 func (ck *Clerk) Get(key string) string {
 
 	// You will have to modify this function.
+	sequence := ck.seq +1
+	i := ck.lastLeader
+	for{
+		args := GetArgs{
+			Key:key,
+			ClientId: ck.clientId,
+			Seq : sequence,
+		}
+		var reply GetReply
+		ok := ck.servers[i].Call("KVServer.Get", &args, &reply)
+		if ok && !reply.WrongLeader{
+			ck.lastLeader = i
+			ck.seq = sequence
+			return reply.Value
+		}
+		i = (i+1)%len(ck.servers)
+	}
 	return ""
 }
 
@@ -54,6 +76,25 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
+	sequence := ck.seq +1
+	i := ck.lastLeader
+	for{
+		args := PutAppendArgs{
+			Key:key,
+			Value:value,
+			Op:op,
+			ClientId : ck.clientId,
+			Seq : sequence,
+		}
+		var reply PutAppendReply
+		ok := ck.servers[i].Call("KVServer.PutAppend", &args, &reply)
+		if ok && !reply.WrongLeader{
+			ck.lastLeader = i
+			ck.seq = sequence
+			return
+		}
+		i = (i+1) % len(ck.servers)
+	}
 }
 
 func (ck *Clerk) Put(key string, value string) {
