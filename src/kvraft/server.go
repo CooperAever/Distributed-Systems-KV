@@ -7,6 +7,8 @@ import (
 	"raft"
 	"sync"
 	"time"
+	"bytes"
+	"fmt"
 )
 
 const Debug = 0
@@ -43,6 +45,8 @@ type KVServer struct {
 	database map[string]string
 	chMap map[int] chan Op
 	lastApplied map[int64] int
+
+	appliedRaftLogIndex int // 3B
 }
 
 
@@ -101,6 +105,10 @@ func (kv *KVServer) waitApplying(op Op,timeout time.Duration) bool{
 		return true
 	}
 
+	if kv.shouldTakeSnapshot(){
+		kv.takeSnapshot()
+	}
+
 	var wrongLeader bool
 
 	kv.mu.Lock()
@@ -157,6 +165,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv := new(KVServer)
 	kv.me = me
 	kv.maxraftstate = maxraftstate
+	// fmt.Printf(" maxraftstate =  %d\n",maxraftstate)
 
 	// You may need initialization code here.
 
@@ -168,11 +177,21 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.chMap = make(map[int] chan Op)
 	kv.lastApplied = make(map[int64] int)
 
+	// 3B recover from snapshot
+	snapshot := persister.ReadSnapshot()
+	kv.installSnapshot(snapshot)
+
 	go func(){
 		for msg := range kv.applyCh{
 			if msg.CommandValid == false{
+				switch msg.Command.(string){
+				case "InstallSnapshot":
+					kv.installSnapshot(msg.CommandData)
+				}
 				continue
 			}
+
+
 
 			op := msg.Command.(Op)
 
@@ -189,6 +208,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 			//Get() does not need to modify database,skip
 			}
 			kv.lastApplied[op.ClientId] = op.Seq
+			kv.appliedRaftLogIndex = msg.CommandIndex
 
 			if ch,ok := kv.chMap[msg.CommandIndex];ok{
 				ch <- op
@@ -208,3 +228,49 @@ func (kv *KVServer)isDuplicateRequest(clientId int64,seq int) bool{
 	}
 	return true
 }
+
+
+// detect raft log size , decided whether need snapshot
+func (kv *KVServer) shouldTakeSnapshot() bool{
+	if kv.maxraftstate == -1 {
+		return false
+	}
+	// fmt.Printf("log size : %d  and max : %d\n",kv.rf.GetRaftStateSize(),kv.maxraftstate)
+	if kv.rf.GetRaftStateSize() >= kv.maxraftstate{
+		return true
+	}
+	return false
+}
+
+// decided take snapshot and encode self state
+func (kv *KVServer) takeSnapshot(){
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+
+	kv.mu.Lock()
+	e.Encode(kv.database)
+	e.Encode(kv.lastApplied)
+	appliedRaftLogIndex := kv.appliedRaftLogIndex
+	kv.mu.Unlock()
+
+	kv.rf.ReplaceLogWithSnapshot(appliedRaftLogIndex,w.Bytes())
+}
+
+// apply snapshot to database and lastApplied
+func (kv *KVServer) installSnapshot(snapshot []byte){
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
+	if snapshot != nil{
+		r := bytes.NewBuffer(snapshot)
+		d := labgob.NewDecoder(r)
+		if d.Decode(&kv.database) != nil || d.Decode(&kv.lastApplied) != nil{
+			fmt.Printf("kvserver %d fails to recover from snapshot\n",kv.me)
+		}
+	}
+}
+
+
+
+
+
