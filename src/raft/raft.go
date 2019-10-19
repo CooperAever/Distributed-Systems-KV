@@ -52,7 +52,7 @@ func randElectionTimeout() time.Duration{
 //
 // in Lab 3 you'll want to send other kinds of messages (e.g.,
 // snapshots) on the applyCh; at that point you can add fields to
-// ApplyMsg, but set CommandValid to false for these other uses.
+// ƒ, but set CommandValid to false for these other uses.
 //
 type ApplyMsg struct {
 	CommandValid bool
@@ -171,7 +171,7 @@ func (rf *Raft) readPersist(data []byte) {
 	var log []Entry
 	if d.Decode(&currentTerm) != nil || 
 		d.Decode(&votedFor) != nil || 
-		  d.Decode(&snapshottedIndex) != nil||d.Decode(&log)!= nil {
+		  d.Decode(&snapshottedIndex) != nil|| d.Decode(&log)!= nil {
 			fmt.Println("readPersist fail!")
 	}else{
 
@@ -179,6 +179,7 @@ func (rf *Raft) readPersist(data []byte) {
 		rf.votedFor = votedFor
 		rf.snapshottedIndex = snapshottedIndex
 		rf.log = log
+
 		rf.commitIndex = snapshottedIndex
 		rf.lastApplied = snapshottedIndex
 	}
@@ -236,7 +237,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	}
 
 	lastLogIndex := len(rf.log)-1
-	if args.LastLogTerm < rf.log[lastLogIndex].Term || (args.LastLogTerm == rf.log[lastLogIndex].Term && args.LastLogIndex < lastLogIndex + rf.snapshottedIndex){
+	if args.LastLogTerm < rf.log[lastLogIndex].Term || (args.LastLogTerm == rf.log[lastLogIndex].Term && args.LastLogIndex < (lastLogIndex + rf.snapshottedIndex)){
 		reply.VoteGranted = false
 		return
 	}
@@ -280,6 +281,8 @@ type AppendEntriesReply struct {
 	ConflictTerm int 	//2C part:term of ConflictEntry
 	ConflictIndex int 	//2C part:the first index in ConflictTerm
 }
+
+
 
 //
 // example AppendEntries RPC handler.
@@ -369,6 +372,22 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	rf.log = rf.log[:rf.getRelativeLogIndex(args.PrevLogIndex+1)]
 	rf.log = append(rf.log,args.Entries...)
+	// unmatch_idx := -1
+	// for idx := range args.Entries {
+	// 	if len(rf.log) < rf.getRelativeLogIndex(args.PrevLogIndex+2+idx) ||
+	// 		rf.log[rf.getRelativeLogIndex(args.PrevLogIndex+1+idx)].Term != args.Entries[idx].Term {
+	// 		// unmatch log found
+	// 		unmatch_idx = idx
+	// 		break
+	// 	}
+	// }
+
+	// if unmatch_idx != -1 {
+	// 	// there are unmatch entries
+	// 	// truncate unmatch Follower entries, and apply Leader entries
+	// 	rf.log = rf.log[:rf.getRelativeLogIndex(args.PrevLogIndex+1+unmatch_idx)]
+	// 	rf.log = append(rf.log, args.Entries[unmatch_idx:]...)
+	// }
 
 	if args.LeaderCommit > rf.commitIndex{
 		lastLogIndex := len(rf.log) -1 + rf.snapshottedIndex
@@ -406,6 +425,8 @@ func (rf *Raft)setCommit(commitIndex int){
 		}(rf.lastApplied+1,rf.log[rf.getRelativeLogIndex(rf.lastApplied+1) :rf.getRelativeLogIndex(rf.commitIndex+1)])
 	}
 }
+
+
 
 //
 // example code to send a RequestVote RPC to a server.
@@ -476,6 +497,7 @@ func (rf *Raft) changeState(s int){
 		for i:= range rf.matchIndex{
 			rf.matchIndex[i] = rf.snapshottedIndex
 		}
+
 		rf.electionTimer.Stop()
 		rf.broadcastEntries()
 		rf.heartbeatTimer.Reset(heartbeatInterval)
@@ -494,7 +516,7 @@ func (rf *Raft) startElection(){
 	args := RequestVoteArgs{
 		Term : rf.currentTerm,
 		CandidateId : rf.me,
-		LastLogIndex : lastLogIndex,
+		LastLogIndex : lastLogIndex+rf.snapshottedIndex,
 		LastLogTerm : rf.log[lastLogIndex].Term,
 	}
 
@@ -529,6 +551,9 @@ func (rf *Raft) startElection(){
 
 	}
 }
+
+
+
 
 // 2A part: write a function to broadcast periodically
 func (rf *Raft) broadcastEntries(){
@@ -567,6 +592,10 @@ func (rf *Raft) broadcastEntries(){
 			var reply AppendEntriesReply
 			if rf.sendAppendEntries(peer,&args,&reply){
 				rf.mu.Lock()
+				if rf.state != Leader {
+					rf.mu.Unlock()
+					return
+				}
 				if reply.Success{
 					rf.matchIndex[peer] = args.PrevLogIndex + len(args.Entries)
 					rf.nextIndex[peer] = rf.matchIndex[peer] +1
@@ -627,7 +656,6 @@ func (rf *Raft) broadcastEntries(){
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	defer rf.persist()
 	index := -1
 	term := -1
 	isLeader := true
@@ -640,8 +668,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		rf.log = append(rf.log,Entry{Term:term,Command:command})
 		rf.matchIndex[rf.me] = index
 		rf.nextIndex[rf.me] = index+1
-		rf.broadcastEntries()
+		rf.persist()
 		// fmt.Printf("Leader %d apply %v cmd\n",rf.me,command)
+		rf.broadcastEntries()
 		rf.mu.Unlock()
 	}
 	return index, term, isLeader
@@ -657,11 +686,12 @@ func (rf *Raft) Kill() {
 	// Your code here, if desired.
 }
 
+
 //
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
 // server's port is peers[me]. all the servers' peers[] arrays
-// have the same order. persister is a place for this server to
+//broad have the same order. persister is a place for this server to
 // save its persistent state, and also initially holds the most
 // recent saved state, if any. applyCh is a channel on which the
 // tester or service expects Raft to send ApplyMsg messages.
@@ -683,7 +713,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.electionTimer = time.NewTimer(randElectionTimeout())
 	rf.heartbeatTimer = time.NewTimer(heartbeatInterval)
 
+
 	// 2B part: initialize log,commitIndex,lastApplied,nextIndex,matchIndex,applyCh
+	rf.applyCh = applyCh
 	rf.log = make([]Entry,1) 	//first index is 1,in case of traversal overflow
 	
 	// initialize from state persisted before a crash
@@ -696,11 +728,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		rf.nextIndex[i] = len(rf.log)
 	}
 	rf.matchIndex = make([]int,len(rf.peers))
-	rf.applyCh = applyCh
-	fmt.Printf("server %d restart and persist\n",rf.me)
+	
+	// fmt.Printf("server %d restart and persist\n",rf.me)
 
 	// creating a background goroutine that will listen electionTimer and heartbeatTimer
-	go func(rf *Raft){
+	go func(node *Raft){
 		for{
 			select{
 			case <- rf.electionTimer.C:
@@ -712,8 +744,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 					rf.startElection()
 				}
 				rf.mu.Unlock()
+
 			case <- rf.heartbeatTimer.C:
 				rf.mu.Lock()
+				// fmt.Printf("%d receive hearbeat\n",rf.me)
 				if rf.state == Leader{
 					rf.broadcastEntries()
 					rf.heartbeatTimer.Reset(heartbeatInterval)
@@ -739,13 +773,14 @@ func (rf *Raft) getRelativeLogIndex(i int) int{
 func(rf *Raft) ReplaceLogWithSnapshot(appliedIndex int,kvSnapshot []byte){
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	fmt.Printf("%d begin to trim from %d to %d\n",rf.me,rf.snapshottedIndex,appliedIndex)
+
 	if appliedIndex <= rf.snapshottedIndex{
 		return
 	}
 
 	// truncate log ,keep snapshottedIndex as a guard at rf.log[0]
 	rf.log = rf.log[rf.getRelativeLogIndex(appliedIndex):]
+	// fmt.Printf("%d begin to trim from %d to %d\n",rf.me,rf.snapshottedIndex,appliedIndex)
 	rf.snapshottedIndex = appliedIndex
 	rf.persister.SaveStateAndSnapshot(rf.encodeRaftState(),kvSnapshot)
 
@@ -830,7 +865,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs,reply *InstallSnapshot
 	// last log entry in snapshot, retain log entries following it
 	lastIncludedRelativeIndex := rf.getRelativeLogIndex(args.LastIncludedIndex)
 	if len(rf.log) > lastIncludedRelativeIndex && rf.log[lastIncludedRelativeIndex].Term == args.LastIncludeTerm{
-		rf. log = rf.log[lastIncludedRelativeIndex:]
+		rf.log = rf.log[lastIncludedRelativeIndex:]
 	}else{
 		// discard entire log and force correct log
 		rf.log = []Entry{{Term:args.LastIncludeTerm,Command:nil}}
@@ -869,8 +904,6 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs,reply *InstallSnapshot
 		rf.applyCh <- msg
 	}(installsnapshotCommand)
 }
-
-
 
 
 

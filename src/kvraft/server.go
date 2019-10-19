@@ -121,9 +121,7 @@ func (kv *KVServer) waitApplying(op Op,timeout time.Duration) bool{
 
 	select{
 	case c := <- ch:
-		kv.mu.Lock()
-		delete(kv.chMap,index)
-		kv.mu.Unlock()
+		
 		if c.ClientId != op.ClientId || c.Seq != op.Seq{
 			wrongLeader = true
 		}else{
@@ -139,6 +137,10 @@ func (kv *KVServer) waitApplying(op Op,timeout time.Duration) bool{
 		}
 		kv.mu.Unlock()
 	}
+
+	kv.mu.Lock()
+	delete(kv.chMap,index)
+	kv.mu.Unlock()
 
 	return wrongLeader
 }
