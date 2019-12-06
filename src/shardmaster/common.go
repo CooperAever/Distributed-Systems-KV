@@ -36,6 +36,11 @@ type Err string
 
 type JoinArgs struct {
 	Servers map[int][]string // new GID -> servers mappings
+	// You'll have to add definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	ClientId int64
+	Seq int 
 }
 
 type JoinReply struct {
@@ -45,6 +50,11 @@ type JoinReply struct {
 
 type LeaveArgs struct {
 	GIDs []int
+	// You'll have to add definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	ClientId int64
+	Seq int 
 }
 
 type LeaveReply struct {
@@ -55,6 +65,11 @@ type LeaveReply struct {
 type MoveArgs struct {
 	Shard int
 	GID   int
+	// You'll have to add definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	ClientId int64
+	Seq int 
 }
 
 type MoveReply struct {
@@ -64,6 +79,11 @@ type MoveReply struct {
 
 type QueryArgs struct {
 	Num int // desired config number
+	// You'll have to add definitions here.
+	// Field names must start with capital letters,
+	// otherwise RPC will break.
+	ClientId int64
+	Seq int 
 }
 
 type QueryReply struct {
