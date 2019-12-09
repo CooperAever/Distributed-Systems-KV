@@ -39,8 +39,8 @@ type JoinArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
-	ClientId int64
-	Seq int 
+	Cid int64
+	SeqNum int 
 }
 
 type JoinReply struct {
@@ -53,8 +53,8 @@ type LeaveArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
-	ClientId int64
-	Seq int 
+	Cid int64
+	SeqNum int 
 }
 
 type LeaveReply struct {
@@ -68,8 +68,8 @@ type MoveArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
-	ClientId int64
-	Seq int 
+	Cid int64
+	SeqNum int 
 }
 
 type MoveReply struct {
@@ -82,8 +82,8 @@ type QueryArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
-	ClientId int64
-	Seq int 
+	Cid int64
+	SeqNum int 
 }
 
 type QueryReply struct {
